@@ -22,6 +22,10 @@ const int stepsPerRevolution = 2048;  // change this to fit the number of steps 
 int currentRotations = 0; // shade starts off fully "down"
 int targetPosition = 0;
 
+bool pin7state = LOW;
+bool pin6state = LOW;
+bool pin5state = LOW;
+
 
 // initialize the stepper library on pins 8 through 11:
 Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
@@ -39,18 +43,23 @@ void setup() {
 }
 
 void loop() {
-  if(digitalRead(7)==HIGH){
+  pin7state = digitalRead(7);
+  pin6state = digitalRead(6);
+  pin5state = digitalRead(5);
+  
+  Serial.print("Pin7: ");Serial.print(pin7state);Serial.print(" Pin6: ");Serial.print(pin6state);Serial.print(" Pin5: ");Serial.println(pin5state);
+  
+  if(pin7state==HIGH){
     targetPosition = 9;
-  } else if (digitalRead(6)==HIGH) {
+  } else if (pin6state==HIGH) {
     targetPosition = 4;
-  } else if (digitalRead(5)==HIGH) {
+  } else if (pin5state==HIGH) {
     targetPosition = 0;
   }
   //targetPosition = analogRead(potPin);
   //targetPosition = map(targetPosition,0,1023,0,9);
-  Serial.println(targetPosition);
-  Serial.println("Moving:");
-  Serial.println(targetPosition-currentRotations);
+  Serial.print("Target: ");Serial.println(targetPosition);
+  Serial.print("Moving: ");Serial.println(targetPosition-currentRotations);
   myStepper.step(-1*(targetPosition-currentRotations)*stepsPerRevolution);
   currentRotations=currentRotations+(targetPosition-currentRotations);
   digitalWrite(8,LOW);
