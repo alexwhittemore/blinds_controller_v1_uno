@@ -1,71 +1,83 @@
+#include <AccelStepper.h>
+#define HALFSTEP 8
+#define FULLSTEP 4
 
-/*
- Stepper Motor Control - one revolution
+// Motor pin definitions
+#define motorPin1  3     // IN1 on the ULN2003 driver 1
+#define motorPin2  4     // IN2 on the ULN2003 driver 1
+#define motorPin3  5     // IN3 on the ULN2003 driver 1
+#define motorPin4  6     // IN4 on the ULN2003 driver 1
 
- This program drives a unipolar or bipolar stepper motor.
- The motor is attached to digital pins 8 - 11 of the Arduino.
+#define stepsPerRotation 2048
+#define curtainExtent 10 // Rotations to get to the other end of the throw
 
- The motor should revolve one revolution in one direction, then
- one revolution in the other direction.
+#define downPin 8
+#define midPin 9
+#define upPin 10
 
+// Initialize with pin sequence IN1-IN3-IN2-IN4 for using the AccelStepper with 28BYJ-48
+AccelStepper stepper1(FULLSTEP, motorPin1, motorPin3, motorPin2, motorPin4);
 
- Created 11 Mar. 2007
- Modified 30 Nov. 2009
- by Tom Igoe
+// Store control pin states
+bool downPinState = LOW;
+bool midPinState = LOW;
+bool upPinState = LOW;
 
- */
-
-#include <Stepper.h>
-
-const int stepsPerRevolution = 2048;  // change this to fit the number of steps per revolution of your motor
-
-int currentRotations = 0; // shade starts off fully "down"
-int targetPosition = 0;
-
-bool pin7state = LOW;
-bool pin6state = LOW;
-bool pin5state = LOW;
-
-
-// initialize the stepper library on pins 8 through 11:
-Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
+// Keep track of time since last digital pin check
+unsigned long lastExecution = 0;
 
 void setup() {
-  // Set the right digital pins to input
-  pinMode(7, INPUT); // 7 high will be all the way up (9 rotations)
-  pinMode(6, INPUT); // 6 will be mid-level (4 rotations)
-  pinMode(5, INPUT); // 5 will be down (0 rotations)
-  
-  // set the speed at 10 rpm:
-  myStepper.setSpeed(10);
-  // initialize the serial port:
   Serial.begin(9600);
-}
+  Serial.println("Starting.");
+  stepper1.setMaxSpeed(1000.0);
+  stepper1.setAcceleration(500.0);
+  stepper1.setSpeed(500);
+  //stepper1.moveTo(2048);
 
-void loop() {
-  pin7state = digitalRead(7);
-  pin6state = digitalRead(6);
-  pin5state = digitalRead(5);
-  
-  Serial.print("Pin7: ");Serial.print(pin7state);Serial.print(" Pin6: ");Serial.print(pin6state);Serial.print(" Pin5: ");Serial.println(pin5state);
-  
-  if(pin7state==HIGH){
-    targetPosition = 9;
-  } else if (pin6state==HIGH) {
-    targetPosition = 4;
-  } else if (pin5state==HIGH) {
-    targetPosition = 0;
+}//--(end setup )---
+
+void checkPins(){
+  lastExecution = millis();
+  // Check the state of the control pins, and move to the corresponding position if need be
+  downPinState = digitalRead(downPin);
+  midPinState = digitalRead(midPin);
+  upPinState = digitalRead(upPin);
+
+  // Tell serial what's up
+  Serial.print("downPin: ");Serial.print(downPinState);Serial.print(" midPin: ");Serial.print(midPinState);Serial.print(" upPin: ");Serial.println(upPinState);
+
+  if (downPinState == HIGH) {
+    // Move to the 'down' position
+    Serial.println("Moving DOWN");
+    stepper1.moveTo(0);
+  } else if (midPinState == HIGH) {
+    // Move to the 'middle' position
+    Serial.println("Moving MIDDLE");
+    stepper1.moveTo(0.5*curtainExtent*stepsPerRotation);
+    //Serial.println(0.5*curtainExtent*stepsPerRotation);
+  } else if (upPinState == HIGH) {
+    // Move to the 'up' position
+    Serial.println("Moving HIGH");
+    stepper1.moveTo(curtainExtent*stepsPerRotation);
   }
-  //targetPosition = analogRead(potPin);
-  //targetPosition = map(targetPosition,0,1023,0,9);
-  Serial.print("Target: ");Serial.println(targetPosition);
-  Serial.print("Moving: ");Serial.println(targetPosition-currentRotations);
-  myStepper.step(-1*(targetPosition-currentRotations)*stepsPerRevolution);
-  currentRotations=currentRotations+(targetPosition-currentRotations);
-  digitalWrite(8,LOW);
-  digitalWrite(9,LOW);
-  digitalWrite(10,LOW);
-  digitalWrite(11,LOW);
-  delay(2000);
-}
+  /*
+  //Change direction when the stepper reaches the target position
+  if (stepper1.distanceToGo() == 0) {
+    stepper1.moveTo(-stepper1.currentPosition());
+  }
+  */
 
+  // Check if the stepper is finished, and if so, turn off the pins
+  if (stepper1.distanceToGo() == 0) {
+    // Quit trying to set fire to my windows!
+    stepper1.disableOutputs();
+  }
+}
+void loop() {
+  if (millis() >= (lastExecution + 1000)){
+    // If it's been over a second since last run
+    checkPins();
+  }
+  stepper1.run();
+  //delay(1000);
+}
